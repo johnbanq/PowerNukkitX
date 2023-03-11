@@ -146,6 +146,8 @@ public class Server {
 
     private static Server instance = null;
 
+    private final LevelManager levelManager;
+
     private BanList banByName;
 
     private BanList banByIP;
@@ -337,7 +339,8 @@ public class Server {
         }
         instance = this;
         config = new Config();
-        levelArray = Level.EMPTY_ARRAY;
+        levelManager = new LevelManager();
+        levelManager.setLevelArray(Level.EMPTY_ARRAY);
         launchTime = System.currentTimeMillis();
         BatchPacket batchPacket = new BatchPacket();
         batchPacket.payload = EmptyArrays.EMPTY_BYTES;
@@ -578,7 +581,8 @@ public class Server {
 
         log.info("Loading {} ...", TextFormat.GREEN + "nukkit.yml" + TextFormat.WHITE);
         this.config = new Config(this.dataPath + "nukkit.yml", Config.YAML);
-        levelArray = Level.EMPTY_ARRAY;
+        levelManager = new LevelManager();
+        levelManager.setLevelArray(Level.EMPTY_ARRAY);
 
         Nukkit.DEBUG = NukkitMath.clamp(this.getConfig("debug.level", 1), 1, 3);
 
@@ -1268,7 +1272,7 @@ public class Server {
 
         log.info("Saving levels...");
 
-        for (Level level : this.levelArray) {
+        for (Level level : this.levelManager.getLevelArray()) {
             level.save();
         }
 
@@ -1366,7 +1370,7 @@ public class Server {
             this.scheduler.mainThreadHeartbeat(Integer.MAX_VALUE);
 
             log.debug("Unloading all levels");
-            for (Level level : this.levelArray) {
+            for (Level level : this.levelManager.getLevelArray()) {
                 this.unloadLevel(level, true);
             }
 
@@ -1476,9 +1480,9 @@ public class Server {
 
                         { // Instead of wasting time, do something potentially useful
                             int offset = 0;
-                            for (int i = 0; i < levelArray.length; i++) {
-                                offset = (i + lastLevelGC) % levelArray.length;
-                                Level level = levelArray[offset];
+                            for (int i = 0; i < levelManager.getLevelArray().length; i++) {
+                                offset = (i + lastLevelGC) % levelManager.getLevelArray().length;
+                                Level level = levelManager.getLevelArray()[offset];
                                 level.doGarbageCollection(allocated - 1);
                                 allocated = next - System.currentTimeMillis();
                                 if (allocated <= 0) {
@@ -1654,7 +1658,7 @@ public class Server {
         }
 
         //Do level ticks
-        for (Level level : this.levelArray) {
+        for (Level level : this.levelManager.getLevelArray()) {
             if (level.getTickRate() > this.baseTickRate && --level.tickRateCounter > 0) {
                 continue;
             }
@@ -1705,7 +1709,7 @@ public class Server {
                 }
             }
 
-            for (Level level : this.levelArray) {
+            for (Level level : this.levelManager.getLevelArray()) {
                 level.save();
             }
             Timings.levelSaveTimer.stopTiming();
@@ -1784,7 +1788,7 @@ public class Server {
         }
 
         if (this.tickCounter % 100 == 0) {
-            CompletableFuture.allOf(Arrays.stream(this.levelArray).parallel()
+            CompletableFuture.allOf(Arrays.stream(this.levelManager.getLevelArray()).parallel()
                     .flatMap(l -> l.asyncChunkGarbageCollection().stream())
                     .toArray(CompletableFuture[]::new));
         }
@@ -1985,7 +1989,7 @@ public class Server {
      */
     public void setAutoSave(boolean autoSave) {
         this.autoSave = autoSave;
-        for (Level level : this.levelArray) {
+        for (Level level : this.levelManager.getLevelArray()) {
             level.setAutoSave(this.autoSave);
         }
     }
@@ -3213,45 +3217,18 @@ public class Server {
 
     // region level - 世界管理
 
-    private final Map<Integer, Level> levels = new HashMap<Integer, Level>() {
-        @Override
-        public Level put(Integer key, Level value) {
-            Level result = super.put(key, value);
-            levelArray = levels.values().toArray(Level.EMPTY_ARRAY);
-            return result;
-        }
-
-        @Override
-        public boolean remove(Object key, Object value) {
-            boolean result = super.remove(key, value);
-            levelArray = levels.values().toArray(Level.EMPTY_ARRAY);
-            return result;
-        }
-
-        @Override
-        public Level remove(Object key) {
-            Level result = super.remove(key);
-            levelArray = levels.values().toArray(Level.EMPTY_ARRAY);
-            return result;
-        }
-    };
-
-    private Level[] levelArray;
-
-    private Level defaultLevel = null;
-
     /**
      * @return 获得所有游戏世界<br>Get all the game world
      */
     public Map<Integer, Level> getLevels() {
-        return levels;
+        return levelManager.getLevels();
     }
 
     /**
      * @return 获得默认游戏世界<br>Get the default world
      */
     public Level getDefaultLevel() {
-        return defaultLevel;
+        return levelManager.getDefaultLevel();
     }
 
 
@@ -3263,8 +3240,8 @@ public class Server {
      * @param defaultLevel 默认游戏世界<br>default game world
      */
     public void setDefaultLevel(Level defaultLevel) {
-        if (defaultLevel == null || (this.isLevelLoaded(defaultLevel.getFolderName()) && defaultLevel != this.defaultLevel)) {
-            this.defaultLevel = defaultLevel;
+        if (defaultLevel == null || (this.isLevelLoaded(defaultLevel.getFolderName()) && defaultLevel != this.levelManager.getDefaultLevel())) {
+            this.levelManager.setDefaultLevel(defaultLevel);
         }
     }
 
@@ -3286,8 +3263,8 @@ public class Server {
      * @return level实例<br>level instance
      */
     public Level getLevel(int levelId) {
-        if (this.levels.containsKey(levelId)) {
-            return this.levels.get(levelId);
+        if (this.levelManager.getLevels().containsKey(levelId)) {
+            return this.levelManager.getLevels().get(levelId);
         }
         return null;
     }
@@ -3301,7 +3278,7 @@ public class Server {
      * @return level实例<br>level instance
      */
     public Level getLevelByName(String name) {
-        for (Level level : this.levelArray) {
+        for (Level level : this.levelManager.getLevelArray()) {
             if (level.getFolderName().equalsIgnoreCase(name)) {
                 return level;
             }
@@ -3368,7 +3345,7 @@ public class Server {
             return false;
         }
 
-        this.levels.put(level.getId(), level);
+        this.levelManager.getLevels().put(level.getId(), level);
 
         level.initLevel();
 
@@ -3470,7 +3447,7 @@ public class Server {
             provider.getMethod("generate", String.class, String.class, long.class, Class.class, Map.class).invoke(null, path, name, seed, generator, options);
 
             level = new Level(this, name, path, provider);
-            this.levels.put(level.getId(), level);
+            this.levelManager.getLevels().put(level.getId(), level);
 
             level.initLevel(givenDimensionData);
             level.setTickRate(this.baseTickRate);
