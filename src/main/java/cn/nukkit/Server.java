@@ -288,34 +288,7 @@ public class Server {
 
     private PositionTrackingService positionTrackingService;
 
-    private final Map<Integer, Level> levels = new HashMap<Integer, Level>() {
-        @Override
-        public Level put(Integer key, Level value) {
-            Level result = super.put(key, value);
-            levelArray = levels.values().toArray(Level.EMPTY_ARRAY);
-            return result;
-        }
-
-        @Override
-        public boolean remove(Object key, Object value) {
-            boolean result = super.remove(key, value);
-            levelArray = levels.values().toArray(Level.EMPTY_ARRAY);
-            return result;
-        }
-
-        @Override
-        public Level remove(Object key) {
-            Level result = super.remove(key);
-            levelArray = levels.values().toArray(Level.EMPTY_ARRAY);
-            return result;
-        }
-    };
-
-    private Level[] levelArray;
-
     private final ServiceManager serviceManager = new NKServiceManager();
-
-    private Level defaultLevel = null;
 
     private boolean allowNether;
 
@@ -2759,301 +2732,6 @@ public class Server {
     }
 
 
-    /**
-     * @return 获得所有游戏世界<br>Get all the game world
-     */
-    public Map<Integer, Level> getLevels() {
-        return levels;
-    }
-
-    /**
-     * @return 获得默认游戏世界<br>Get the default world
-     */
-    public Level getDefaultLevel() {
-        return defaultLevel;
-    }
-
-
-    /**
-     * 设置默认游戏世界
-     * <p>
-     * Set default game world
-     *
-     * @param defaultLevel 默认游戏世界<br>default game world
-     */
-    public void setDefaultLevel(Level defaultLevel) {
-        if (defaultLevel == null || (this.isLevelLoaded(defaultLevel.getFolderName()) && defaultLevel != this.defaultLevel)) {
-            this.defaultLevel = defaultLevel;
-        }
-    }
-
-    /**
-     * @param name 世界名字
-     * @return 世界是否已经加载<br>Is the world already loaded
-     */
-    public boolean isLevelLoaded(String name) {
-        return this.getLevelByName(name) != null;
-    }
-
-
-    /**
-     * 从世界id得到世界,0主世界 1 地狱 2 末地
-     * <p>
-     * Get world from world id,0 OVERWORLD 1 NETHER 2 THE_END
-     *
-     * @param levelId 世界id<br>world id
-     * @return level实例<br>level instance
-     */
-    public Level getLevel(int levelId) {
-        if (this.levels.containsKey(levelId)) {
-            return this.levels.get(levelId);
-        }
-        return null;
-    }
-
-    /**
-     * 从世界名得到世界,overworld 主世界 nether 地狱 the_end 末地
-     * <p>
-     * Get world from world name,{@code overworld nether the_end}
-     *
-     * @param name 世界名<br>world name
-     * @return level实例<br>level instance
-     */
-    public Level getLevelByName(String name) {
-        for (Level level : this.levelArray) {
-            if (level.getFolderName().equalsIgnoreCase(name)) {
-                return level;
-            }
-        }
-
-        return null;
-    }
-
-    public boolean unloadLevel(Level level) {
-        return this.unloadLevel(level, false);
-    }
-
-    /**
-     * 卸载世界
-     * <p>
-     * unload level
-     *
-     * @param level       世界
-     * @param forceUnload 是否强制卸载<br>whether to force uninstallation.
-     * @return 卸载是否成功
-     */
-    public boolean unloadLevel(Level level, boolean forceUnload) {
-        if (level == this.getDefaultLevel() && !forceUnload) {
-            throw new IllegalStateException("The default level cannot be unloaded while running, please switch levels.");
-        }
-
-        return level.unload(forceUnload);
-
-    }
-
-    public boolean loadLevel(String name) {
-        if (Objects.equals(name.trim(), "")) {
-            throw new LevelException("Invalid empty level name");
-        }
-        if (this.isLevelLoaded(name)) {
-            return true;
-        } else if (!this.isLevelGenerated(name)) {
-            log.warn(this.getLanguage().tr("nukkit.level.notFound", name));
-
-            return false;
-        }
-
-        String path;
-
-        if (name.contains("/") || name.contains("\\")) {
-            path = name;
-        } else {
-            path = this.getDataPath() + "worlds/" + name + "/";
-        }
-
-        Class<? extends LevelProvider> provider = LevelProviderManager.getProvider(path);
-
-        if (provider == null) {
-            log.error(this.getLanguage().tr("nukkit.level.loadError", new String[]{name, "Unknown provider"}));
-
-            return false;
-        }
-
-        Level level;
-        try {
-            level = new Level(this, name, path, provider);
-        } catch (Exception e) {
-            log.error(this.getLanguage().tr("nukkit.level.loadError", name, e.getMessage()), e);
-            return false;
-        }
-
-        this.levels.put(level.getId(), level);
-
-        level.initLevel();
-
-        //convert old Nukkit World
-        if (level.getProvider() instanceof Anvil anvil && anvil.isOldAnvil() && level.isOverWorld()) {
-            log.info(Server.getInstance().getLanguage().tr("nukkit.anvil.converter.update"));
-            var scan = new Scanner(System.in);
-            var result = scan.next();
-            if (result.equalsIgnoreCase("true") || result.equalsIgnoreCase("t")) {
-                File file = new File(Path.of(path).resolve("region").toUri());
-                if (file.exists()) {
-                    var regions = file.listFiles();
-                    if (regions != null) {
-                        var bid = Server.getInstance().addBusying(System.currentTimeMillis());
-                        final Method loadRegion;
-                        try {
-                            loadRegion = Anvil.class.getDeclaredMethod("loadRegion", int.class, int.class);
-                            loadRegion.setAccessible(true);
-                        } catch (NoSuchMethodException e) {
-                            throw new RuntimeException(e);
-                        }
-                        var allTask = new ArrayList<CompletableFuture<?>>();
-                        for (var region : regions) {
-                            allTask.add(CompletableFuture.runAsync(() -> {
-                                var regionPos = region.getName().split("\\.");
-                                var regionX = Integer.parseInt(regionPos[1]);
-                                var regionZ = Integer.parseInt(regionPos[2]);
-                                BaseRegionLoader loader;
-                                try {
-                                    loader = (BaseRegionLoader) loadRegion.invoke(anvil, regionX, regionZ);
-                                } catch (IllegalAccessException | InvocationTargetException e) {
-                                    throw new RuntimeException(e);
-                                }
-                                OldNukkitLevelConvert.convertToPNXWorld(anvil, loader);
-                            }, this.computeThreadPool));
-                        }
-                        CompletableFuture.allOf(allTask.toArray(new CompletableFuture<?>[]{})).join();
-                        Server.getInstance().removeBusying(bid);
-                        loadRegion.setAccessible(false);
-                    }
-                }
-            } else System.exit(0);
-        }
-
-        this.getPluginManager().callEvent(new LevelLoadEvent(level));
-        level.setTickRate(this.baseTickRate);
-        return true;
-    }
-
-    public boolean generateLevel(String name) {
-        return this.generateLevel(name, new java.util.Random().nextLong());
-    }
-
-    public boolean generateLevel(String name, long seed) {
-        return this.generateLevel(name, seed, null);
-    }
-
-    public boolean generateLevel(String name, long seed, Class<? extends Generator> generator) {
-        return this.generateLevel(name, seed, generator, new HashMap<>());
-    }
-
-    public boolean generateLevel(String name, long seed, Class<? extends Generator> generator, Map<String, Object> options) {
-        return generateLevel(name, seed, generator, options, null);
-    }
-
-    @PowerNukkitXOnly
-    @Since("1.19.20-r3")
-    public boolean generateLevel(String name, long seed, Class<? extends Generator> generator, Map<String, Object> options, DimensionData givenDimensionData) {
-        return generateLevel(name, seed, generator, options, null, null);
-    }
-
-    public boolean generateLevel(String name, long seed, Class<? extends Generator> generator, Map<String, Object> options, DimensionData givenDimensionData, Class<? extends LevelProvider> provider) {
-        if (Objects.equals(name.trim(), "") || this.isLevelGenerated(name)) {
-            return false;
-        }
-
-        if (!options.containsKey("preset")) {
-            options.put("preset", this.getPropertyString("generator-settings", ""));
-        }
-
-        if (generator == null) {
-            generator = Generator.getGenerator(this.getLevelType());
-        }
-
-        if (provider == null) {
-            provider = LevelProviderManager.getProviderByName(this.getConfig().get("level-settings.default-format", "anvil"));
-        }
-
-        String path;
-
-        if (name.contains("/") || name.contains("\\")) {
-            path = name;
-        } else {
-            path = this.getDataPath() + "worlds/" + name + "/";
-        }
-
-        Level level;
-        try {
-            provider.getMethod("generate", String.class, String.class, long.class, Class.class, Map.class).invoke(null, path, name, seed, generator, options);
-
-            level = new Level(this, name, path, provider);
-            this.levels.put(level.getId(), level);
-
-            level.initLevel(givenDimensionData);
-            level.setTickRate(this.baseTickRate);
-        } catch (Exception e) {
-            log.error(this.getLanguage().tr("nukkit.level.generationError", new String[]{name, Utils.getExceptionMessage(e)}), e);
-            return false;
-        }
-
-        this.getPluginManager().callEvent(new LevelInitEvent(level));
-
-        this.getPluginManager().callEvent(new LevelLoadEvent(level));
-
-        /*this.getLogger().notice(this.getLanguage().tr("nukkit.level.backgroundGeneration", name));
-
-        int centerX = (int) level.getSpawnLocation().getX() >> 4;
-        int centerZ = (int) level.getSpawnLocation().getZ() >> 4;
-
-        TreeMap<String, Integer> order = new TreeMap<>();
-
-        for (int X = -3; X <= 3; ++X) {
-            for (int Z = -3; Z <= 3; ++Z) {
-                int distance = X * X + Z * Z;
-                int chunkX = X + centerX;
-                int chunkZ = Z + centerZ;
-                order.put(Level.chunkHash(chunkX, chunkZ), distance);
-            }
-        }
-
-        List<Map.Entry<String, Integer>> sortList = new ArrayList<>(order.entrySet());
-
-        Collections.sort(sortList, new Comparator<Map.Entry<String, Integer>>() {
-            @Override
-            public int compare(Map.Entry<String, Integer> o1, Map.Entry<String, Integer> o2) {
-                return o2.getValue() - o1.getValue();
-            }
-        });
-
-        for (String index : order.keySet()) {
-            Chunk.Entry entry = Level.getChunkXZ(index);
-            level.populateChunk(entry.chunkX, entry.chunkZ, true);
-        }*/
-        return true;
-    }
-
-    public boolean isLevelGenerated(String name) {
-        if (Objects.equals(name.trim(), "")) {
-            return false;
-        }
-
-        if (this.getLevelByName(name) == null) {
-            String path;
-
-            if (name.contains("/") || name.contains("\\")) {
-                path = name;
-            } else {
-                path = this.getDataPath() + "worlds/" + name + "/";
-            }
-
-            return LevelProviderManager.getProvider(path) != null;
-        }
-
-        return true;
-    }
-
     public BaseLang getLanguage() {
         return baseLang;
     }
@@ -3532,6 +3210,332 @@ public class Server {
     public int getServerAuthoritativeMovement() {
         return serverAuthoritativeMovementMode;
     }
+
+    // region level - 世界管理
+
+    private final Map<Integer, Level> levels = new HashMap<Integer, Level>() {
+        @Override
+        public Level put(Integer key, Level value) {
+            Level result = super.put(key, value);
+            levelArray = levels.values().toArray(Level.EMPTY_ARRAY);
+            return result;
+        }
+
+        @Override
+        public boolean remove(Object key, Object value) {
+            boolean result = super.remove(key, value);
+            levelArray = levels.values().toArray(Level.EMPTY_ARRAY);
+            return result;
+        }
+
+        @Override
+        public Level remove(Object key) {
+            Level result = super.remove(key);
+            levelArray = levels.values().toArray(Level.EMPTY_ARRAY);
+            return result;
+        }
+    };
+
+    private Level[] levelArray;
+
+    private Level defaultLevel = null;
+
+    /**
+     * @return 获得所有游戏世界<br>Get all the game world
+     */
+    public Map<Integer, Level> getLevels() {
+        return levels;
+    }
+
+    /**
+     * @return 获得默认游戏世界<br>Get the default world
+     */
+    public Level getDefaultLevel() {
+        return defaultLevel;
+    }
+
+
+    /**
+     * 设置默认游戏世界
+     * <p>
+     * Set default game world
+     *
+     * @param defaultLevel 默认游戏世界<br>default game world
+     */
+    public void setDefaultLevel(Level defaultLevel) {
+        if (defaultLevel == null || (this.isLevelLoaded(defaultLevel.getFolderName()) && defaultLevel != this.defaultLevel)) {
+            this.defaultLevel = defaultLevel;
+        }
+    }
+
+    /**
+     * @param name 世界名字
+     * @return 世界是否已经加载<br>Is the world already loaded
+     */
+    public boolean isLevelLoaded(String name) {
+        return this.getLevelByName(name) != null;
+    }
+
+
+    /**
+     * 从世界id得到世界,0主世界 1 地狱 2 末地
+     * <p>
+     * Get world from world id,0 OVERWORLD 1 NETHER 2 THE_END
+     *
+     * @param levelId 世界id<br>world id
+     * @return level实例<br>level instance
+     */
+    public Level getLevel(int levelId) {
+        if (this.levels.containsKey(levelId)) {
+            return this.levels.get(levelId);
+        }
+        return null;
+    }
+
+    /**
+     * 从世界名得到世界,overworld 主世界 nether 地狱 the_end 末地
+     * <p>
+     * Get world from world name,{@code overworld nether the_end}
+     *
+     * @param name 世界名<br>world name
+     * @return level实例<br>level instance
+     */
+    public Level getLevelByName(String name) {
+        for (Level level : this.levelArray) {
+            if (level.getFolderName().equalsIgnoreCase(name)) {
+                return level;
+            }
+        }
+
+        return null;
+    }
+
+    public boolean unloadLevel(Level level) {
+        return this.unloadLevel(level, false);
+    }
+
+    /**
+     * 卸载世界
+     * <p>
+     * unload level
+     *
+     * @param level       世界
+     * @param forceUnload 是否强制卸载<br>whether to force uninstallation.
+     * @return 卸载是否成功
+     */
+    public boolean unloadLevel(Level level, boolean forceUnload) {
+        if (level == this.getDefaultLevel() && !forceUnload) {
+            throw new IllegalStateException("The default level cannot be unloaded while running, please switch levels.");
+        }
+
+        return level.unload(forceUnload);
+
+    }
+
+    public boolean loadLevel(String name) {
+        if (Objects.equals(name.trim(), "")) {
+            throw new LevelException("Invalid empty level name");
+        }
+        if (this.isLevelLoaded(name)) {
+            return true;
+        } else if (!this.isLevelGenerated(name)) {
+            log.warn(this.getLanguage().tr("nukkit.level.notFound", name));
+
+            return false;
+        }
+
+        String path;
+
+        if (name.contains("/") || name.contains("\\")) {
+            path = name;
+        } else {
+            path = this.getDataPath() + "worlds/" + name + "/";
+        }
+
+        Class<? extends LevelProvider> provider = LevelProviderManager.getProvider(path);
+
+        if (provider == null) {
+            log.error(this.getLanguage().tr("nukkit.level.loadError", new String[]{name, "Unknown provider"}));
+
+            return false;
+        }
+
+        Level level;
+        try {
+            level = new Level(this, name, path, provider);
+        } catch (Exception e) {
+            log.error(this.getLanguage().tr("nukkit.level.loadError", name, e.getMessage()), e);
+            return false;
+        }
+
+        this.levels.put(level.getId(), level);
+
+        level.initLevel();
+
+        //convert old Nukkit World
+        if (level.getProvider() instanceof Anvil anvil && anvil.isOldAnvil() && level.isOverWorld()) {
+            log.info(Server.getInstance().getLanguage().tr("nukkit.anvil.converter.update"));
+            var scan = new Scanner(System.in);
+            var result = scan.next();
+            if (result.equalsIgnoreCase("true") || result.equalsIgnoreCase("t")) {
+                File file = new File(Path.of(path).resolve("region").toUri());
+                if (file.exists()) {
+                    var regions = file.listFiles();
+                    if (regions != null) {
+                        var bid = Server.getInstance().addBusying(System.currentTimeMillis());
+                        final Method loadRegion;
+                        try {
+                            loadRegion = Anvil.class.getDeclaredMethod("loadRegion", int.class, int.class);
+                            loadRegion.setAccessible(true);
+                        } catch (NoSuchMethodException e) {
+                            throw new RuntimeException(e);
+                        }
+                        var allTask = new ArrayList<CompletableFuture<?>>();
+                        for (var region : regions) {
+                            allTask.add(CompletableFuture.runAsync(() -> {
+                                var regionPos = region.getName().split("\\.");
+                                var regionX = Integer.parseInt(regionPos[1]);
+                                var regionZ = Integer.parseInt(regionPos[2]);
+                                BaseRegionLoader loader;
+                                try {
+                                    loader = (BaseRegionLoader) loadRegion.invoke(anvil, regionX, regionZ);
+                                } catch (IllegalAccessException | InvocationTargetException e) {
+                                    throw new RuntimeException(e);
+                                }
+                                OldNukkitLevelConvert.convertToPNXWorld(anvil, loader);
+                            }, this.computeThreadPool));
+                        }
+                        CompletableFuture.allOf(allTask.toArray(new CompletableFuture<?>[]{})).join();
+                        Server.getInstance().removeBusying(bid);
+                        loadRegion.setAccessible(false);
+                    }
+                }
+            } else System.exit(0);
+        }
+
+        this.getPluginManager().callEvent(new LevelLoadEvent(level));
+        level.setTickRate(this.baseTickRate);
+        return true;
+    }
+
+    public boolean generateLevel(String name) {
+        return this.generateLevel(name, new java.util.Random().nextLong());
+    }
+
+    public boolean generateLevel(String name, long seed) {
+        return this.generateLevel(name, seed, null);
+    }
+
+    public boolean generateLevel(String name, long seed, Class<? extends Generator> generator) {
+        return this.generateLevel(name, seed, generator, new HashMap<>());
+    }
+
+    public boolean generateLevel(String name, long seed, Class<? extends Generator> generator, Map<String, Object> options) {
+        return generateLevel(name, seed, generator, options, null);
+    }
+
+    @PowerNukkitXOnly
+    @Since("1.19.20-r3")
+    public boolean generateLevel(String name, long seed, Class<? extends Generator> generator, Map<String, Object> options, DimensionData givenDimensionData) {
+        return generateLevel(name, seed, generator, options, null, null);
+    }
+
+    public boolean generateLevel(String name, long seed, Class<? extends Generator> generator, Map<String, Object> options, DimensionData givenDimensionData, Class<? extends LevelProvider> provider) {
+        if (Objects.equals(name.trim(), "") || this.isLevelGenerated(name)) {
+            return false;
+        }
+
+        if (!options.containsKey("preset")) {
+            options.put("preset", this.getPropertyString("generator-settings", ""));
+        }
+
+        if (generator == null) {
+            generator = Generator.getGenerator(this.getLevelType());
+        }
+
+        if (provider == null) {
+            provider = LevelProviderManager.getProviderByName(this.getConfig().get("level-settings.default-format", "anvil"));
+        }
+
+        String path;
+
+        if (name.contains("/") || name.contains("\\")) {
+            path = name;
+        } else {
+            path = this.getDataPath() + "worlds/" + name + "/";
+        }
+
+        Level level;
+        try {
+            provider.getMethod("generate", String.class, String.class, long.class, Class.class, Map.class).invoke(null, path, name, seed, generator, options);
+
+            level = new Level(this, name, path, provider);
+            this.levels.put(level.getId(), level);
+
+            level.initLevel(givenDimensionData);
+            level.setTickRate(this.baseTickRate);
+        } catch (Exception e) {
+            log.error(this.getLanguage().tr("nukkit.level.generationError", new String[]{name, Utils.getExceptionMessage(e)}), e);
+            return false;
+        }
+
+        this.getPluginManager().callEvent(new LevelInitEvent(level));
+
+        this.getPluginManager().callEvent(new LevelLoadEvent(level));
+
+        /*this.getLogger().notice(this.getLanguage().tr("nukkit.level.backgroundGeneration", name));
+
+        int centerX = (int) level.getSpawnLocation().getX() >> 4;
+        int centerZ = (int) level.getSpawnLocation().getZ() >> 4;
+
+        TreeMap<String, Integer> order = new TreeMap<>();
+
+        for (int X = -3; X <= 3; ++X) {
+            for (int Z = -3; Z <= 3; ++Z) {
+                int distance = X * X + Z * Z;
+                int chunkX = X + centerX;
+                int chunkZ = Z + centerZ;
+                order.put(Level.chunkHash(chunkX, chunkZ), distance);
+            }
+        }
+
+        List<Map.Entry<String, Integer>> sortList = new ArrayList<>(order.entrySet());
+
+        Collections.sort(sortList, new Comparator<Map.Entry<String, Integer>>() {
+            @Override
+            public int compare(Map.Entry<String, Integer> o1, Map.Entry<String, Integer> o2) {
+                return o2.getValue() - o1.getValue();
+            }
+        });
+
+        for (String index : order.keySet()) {
+            Chunk.Entry entry = Level.getChunkXZ(index);
+            level.populateChunk(entry.chunkX, entry.chunkZ, true);
+        }*/
+        return true;
+    }
+
+    public boolean isLevelGenerated(String name) {
+        if (Objects.equals(name.trim(), "")) {
+            return false;
+        }
+
+        if (this.getLevelByName(name) == null) {
+            String path;
+
+            if (name.contains("/") || name.contains("\\")) {
+                path = name;
+            } else {
+                path = this.getDataPath() + "worlds/" + name + "/";
+            }
+
+            return LevelProviderManager.getProvider(path) != null;
+        }
+
+        return true;
+    }
+
+    // endregion
 
     // region threading - 并发基础设施
 
