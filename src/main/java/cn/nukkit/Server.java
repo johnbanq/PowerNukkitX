@@ -719,64 +719,10 @@ public class Server {
         Generator.addGenerator(TheEnd.class, "the_end", Generator.TYPE_THE_END);
         //todo: add old generator and hell generator
 
-        for (String name : this.getConfig("worlds", new HashMap<String, Object>()).keySet()) {
-            if (!this.loadLevel(name)) {
-                long seed;
-                try {
-                    seed = ((Number) this.getConfig("worlds." + name + ".seed", ThreadLocalRandom.current().nextLong())).longValue();
-                } catch (Exception e) {
-                    try {
-                        seed = this.getConfig("worlds." + name + ".seed").toString().hashCode();
-                    } catch (Exception e2) {
-                        seed = System.currentTimeMillis();
-                        e2.addSuppressed(e);
-                        log.warn("Failed to load the world seed for \"{}\". Generating a random seed", name, e2);
-                    }
-                }
-
-                Map<String, Object> options = new HashMap<>();
-                String[] opts = (this.getConfig("worlds." + name + ".generator", Generator.getGenerator("default").getSimpleName())).split(":");
-                Class<? extends Generator> generator = Generator.getGenerator(opts[0]);
-                if (opts.length > 1) {
-                    StringBuilder preset = new StringBuilder();
-                    for (int i = 1; i < opts.length; i++) {
-                        preset.append(opts[i]).append(":");
-                    }
-                    preset = new StringBuilder(preset.substring(0, preset.length() - 1));
-
-                    options.put("preset", preset.toString());
-                }
-
-                this.generateLevel(name, seed, generator, options);
-            }
-        }
-
-        if (this.getDefaultLevel() == null) {
-            String defaultName = this.getPropertyString("level-name", "world");
-            if (defaultName == null || defaultName.trim().isEmpty()) {
-                log.warn("level-name cannot be null, using default");
-                defaultName = "world";
-                this.setPropertyString("level-name", defaultName);
-            }
-
-            if (!this.loadLevel(defaultName)) {
-                long seed;
-                String seedString = String.valueOf(this.getProperty("level-seed", System.currentTimeMillis()));
-                try {
-                    seed = Long.parseLong(seedString);
-                } catch (NumberFormatException e) {
-                    seed = seedString.hashCode();
-                }
-                this.generateLevel(defaultName, seed == 0 ? System.currentTimeMillis() : seed);
-            }
-
-            this.setDefaultLevel(this.getLevelByName(defaultName));
-        }
-
-        if (this.getDefaultLevel() == null) {
+        boolean defaultLevelLoadSuccess = initializeLevels();
+        if (defaultLevelLoadSuccess) {
             log.fatal(this.getLanguage().tr("nukkit.level.defaultError"));
             this.forceShutdown();
-
             return;
         }
 
@@ -800,7 +746,6 @@ public class Server {
         System.runFinalization();
         this.start();
     }
-
 
     private static void initializeNukkitYaml(String nukkitYamlPath, String languagesCommaList, String language) {
         String fallback = BaseLang.FALLBACK_LANGUAGE;
@@ -2628,6 +2573,65 @@ public class Server {
     }
 
     // region level - 世界相关
+
+    private boolean initializeLevels() {
+        for (String name : this.getConfig("worlds", new HashMap<String, Object>()).keySet()) {
+            if (!this.loadLevel(name)) {
+                long seed;
+                try {
+                    seed = ((Number) this.getConfig("worlds." + name + ".seed", ThreadLocalRandom.current().nextLong())).longValue();
+                } catch (Exception e) {
+                    try {
+                        seed = this.getConfig("worlds." + name + ".seed").toString().hashCode();
+                    } catch (Exception e2) {
+                        seed = System.currentTimeMillis();
+                        e2.addSuppressed(e);
+                        log.warn("Failed to load the world seed for \"{}\". Generating a random seed", name, e2);
+                    }
+                }
+
+                Map<String, Object> options = new HashMap<>();
+                String[] opts = (this.getConfig("worlds." + name + ".generator", Generator.getGenerator("default").getSimpleName())).split(":");
+                Class<? extends Generator> generator = Generator.getGenerator(opts[0]);
+                if (opts.length > 1) {
+                    StringBuilder preset = new StringBuilder();
+                    for (int i = 1; i < opts.length; i++) {
+                        preset.append(opts[i]).append(":");
+                    }
+                    preset = new StringBuilder(preset.substring(0, preset.length() - 1));
+
+                    options.put("preset", preset.toString());
+                }
+
+                this.generateLevel(name, seed, generator, options);
+            }
+        }
+
+        if (this.getDefaultLevel() == null) {
+            String defaultName = this.getPropertyString("level-name", "world");
+            if (defaultName == null || defaultName.trim().isEmpty()) {
+                log.warn("level-name cannot be null, using default");
+                defaultName = "world";
+                this.setPropertyString("level-name", defaultName);
+            }
+
+            if (!this.loadLevel(defaultName)) {
+                long seed;
+                String seedString = String.valueOf(this.getProperty("level-seed", System.currentTimeMillis()));
+                try {
+                    seed = Long.parseLong(seedString);
+                } catch (NumberFormatException e) {
+                    seed = seedString.hashCode();
+                }
+                this.generateLevel(defaultName, seed == 0 ? System.currentTimeMillis() : seed);
+            }
+
+            this.setDefaultLevel(this.getLevelByName(defaultName));
+        }
+        boolean defaultLevelLoadSuccess = this.getDefaultLevel() == null;
+        return defaultLevelLoadSuccess;
+    }
+
 
     /**
      * @return 获得所有游戏世界<br>Get all the game world
