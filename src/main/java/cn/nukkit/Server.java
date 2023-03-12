@@ -343,10 +343,6 @@ public class Server {
 
     @PowerNukkitXOnly
     @Since("1.6.0.0-PNX")
-    private boolean useTerra;
-
-    @PowerNukkitXOnly
-    @Since("1.6.0.0-PNX")
     private boolean enableExperimentMode;
 
     @PowerNukkitXOnly
@@ -516,8 +512,6 @@ public class Server {
         this.allowNether = this.properties.getBoolean("allow-nether", true);
 
         this.allowTheEnd = this.properties.getBoolean("allow-the_end", true);
-
-        this.useTerra = this.properties.getBoolean("use-terra", false);
 
         this.enableExperimentMode = this.properties.getBoolean("enable-experiment-mode", true);
 
@@ -710,6 +704,7 @@ public class Server {
 
         Generator.addGenerator(Flat.class, "flat", Generator.TYPE_FLAT);
         Generator.addGenerator(Normal.class, "normal", Generator.TYPE_INFINITE);
+        var useTerra = this.properties.getBoolean("use-terra", false);
         if (useTerra) {
             Generator.addGenerator(TerraGeneratorWrapper.class, "terra");
             PNXPlatform.getInstance();
