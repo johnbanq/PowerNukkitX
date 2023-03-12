@@ -2556,7 +2556,48 @@ public class Server {
     // region level - 世界相关
 
     private static void initializeLevelSingletons() {
-        EnumLevel.initLevels();
+        Level overworld = getInstance().getDefaultLevel();
+        // attempt to load the nether world if it is allowed in server properties
+        if (getInstance().isNetherAllowed() && !getInstance().loadLevel("nether")) {
+
+            // Nether is allowed, and not found, create the default nether world
+            log.info("No level called \"nether\" found, creating default nether level.");
+
+            // Generate seed for nether and get nether generator
+            long seed = System.currentTimeMillis();
+            Class<? extends Generator> generator = Generator.getGenerator("nether");
+
+            // Generate the nether world
+            getInstance().generateLevel("nether", seed, generator);
+
+            // Finally, load the level if not already loaded and set the level
+            if (!getInstance().isLevelLoaded("nether")) {
+                getInstance().loadLevel("nether");
+            }
+
+        }
+        Level nether = getInstance().getLevelByName("nether");
+        if (nether == null) {
+            // Nether is not found or disabled
+            log.warn("No level called \"nether\" found or nether is disabled in server properties! Nether functionality will be disabled.");
+        }
+
+        // The End
+        if (getInstance().isTheEndAllowed() && !getInstance().loadLevel("the_end")) {
+            getInstance().getLogger().info("No level called \"the_end\" found, creating default the end level.");
+            long seed = System.currentTimeMillis();
+            Class<? extends Generator> generator = Generator.getGenerator("the_end");
+            getInstance().generateLevel("the_end", seed, generator);
+            if (!getInstance().isLevelLoaded("the_end")) {
+                getInstance().loadLevel("the_end");
+            }
+        }
+        Level theEnd = getInstance().getLevelByName("the_end");
+        if (theEnd == null) {
+            getInstance().getLogger().alert("No level called \"the_end\" found or the end is disabled in server properties! The End functionality will be disabled.");
+        }
+
+        EnumLevel.acceptLevelSingletons(overworld, nether, theEnd);
     }
 
     private void initializeLevelStorageProviders() {

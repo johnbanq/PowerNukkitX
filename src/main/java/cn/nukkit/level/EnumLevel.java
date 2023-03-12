@@ -1,10 +1,9 @@
 package cn.nukkit.level;
 
-import cn.nukkit.Server;
 import cn.nukkit.api.PowerNukkitOnly;
 import cn.nukkit.api.PowerNukkitXDifference;
+import cn.nukkit.api.PowerNukkitXInternal;
 import cn.nukkit.api.Since;
-import cn.nukkit.level.generator.Generator;
 import cn.nukkit.math.NukkitMath;
 import lombok.extern.log4j.Log4j2;
 
@@ -16,48 +15,11 @@ public enum EnumLevel {
 
     Level level;
 
-    public static void initLevels() {
-        Level overworld = Server.getInstance().getDefaultLevel();
-        // attempt to load the nether world if it is allowed in server properties
-        if (Server.getInstance().isNetherAllowed() && !Server.getInstance().loadLevel("nether")) {
+    @PowerNukkitXDifference(info="content has been moved, no-op for compatibility, plugins shouldn't call this anyway")
+    public static void initLevels() {}
 
-            // Nether is allowed, and not found, create the default nether world
-            log.info("No level called \"nether\" found, creating default nether level.");
-
-            // Generate seed for nether and get nether generator
-            long seed = System.currentTimeMillis();
-            Class<? extends Generator> generator = Generator.getGenerator("nether");
-
-            // Generate the nether world
-            Server.getInstance().generateLevel("nether", seed, generator);
-
-            // Finally, load the level if not already loaded and set the level
-            if (!Server.getInstance().isLevelLoaded("nether")) {
-                Server.getInstance().loadLevel("nether");
-            }
-
-        }
-        Level nether = Server.getInstance().getLevelByName("nether");
-        if (nether == null) {
-            // Nether is not found or disabled
-            log.warn("No level called \"nether\" found or nether is disabled in server properties! Nether functionality will be disabled.");
-        }
-
-        // The End
-        if (Server.getInstance().isTheEndAllowed() && !Server.getInstance().loadLevel("the_end")) {
-            Server.getInstance().getLogger().info("No level called \"the_end\" found, creating default the end level.");
-            long seed = System.currentTimeMillis();
-            Class<? extends Generator> generator = Generator.getGenerator("the_end");
-            Server.getInstance().generateLevel("the_end", seed, generator);
-            if (!Server.getInstance().isLevelLoaded("the_end")) {
-                Server.getInstance().loadLevel("the_end");
-            }
-        }
-        Level theEnd = Server.getInstance().getLevelByName("the_end");
-        if (theEnd == null) {
-            Server.getInstance().getLogger().alert("No level called \"the_end\" found or the end is disabled in server properties! The End functionality will be disabled.");
-        }
-
+    @PowerNukkitXInternal
+    public static void acceptLevelSingletons(Level overworld, Level nether, Level theEnd) {
         OVERWORLD.level = overworld;
         NETHER.level = nether;
         THE_END.level = theEnd;
