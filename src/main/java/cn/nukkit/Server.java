@@ -773,10 +773,6 @@ public class Server {
             this.setDefaultLevel(this.getLevelByName(defaultName));
         }
 
-        this.getTickingAreaManager().loadAllTickingArea();
-
-        this.properties.save(true);
-
         if (this.getDefaultLevel() == null) {
             log.fatal(this.getLanguage().tr("nukkit.level.defaultError"));
             this.forceShutdown();
@@ -785,6 +781,10 @@ public class Server {
         }
 
         EnumLevel.initLevels();
+
+        this.getTickingAreaManager().loadAllTickingArea();
+
+        this.properties.save(true);
 
         if (this.getConfig("ticks-per.autosave", 6000) > 0) {
             this.autoSaveTicks = this.getConfig("ticks-per.autosave", 6000);
