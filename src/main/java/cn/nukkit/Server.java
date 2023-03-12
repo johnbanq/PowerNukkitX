@@ -700,8 +700,7 @@ public class Server {
 
         this.enablePlugins(PluginLoadOrder.STARTUP);
 
-        LevelProviderManager.addProvider(this, Anvil.class);
-
+        initializeLevelStorageProviders();
         initializeLevelGenerators();
         boolean defaultLevelLoadSuccess = initializeLevels();
         if (defaultLevelLoadSuccess) {
@@ -2557,7 +2556,11 @@ public class Server {
     }
 
     // region level - 世界相关
-
+    
+    private void initializeLevelStorageProviders() {
+        LevelProviderManager.addProvider(this, Anvil.class);
+    }
+    
     private void initializeLevelGenerators() {
         Generator.addGenerator(Flat.class, "flat", Generator.TYPE_FLAT);
         Generator.addGenerator(Normal.class, "normal", Generator.TYPE_INFINITE);
