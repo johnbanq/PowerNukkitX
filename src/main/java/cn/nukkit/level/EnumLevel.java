@@ -17,7 +17,8 @@ public enum EnumLevel {
     Level level;
 
     public static void initLevels() {
-        OVERWORLD.level = Server.getInstance().getDefaultLevel();
+        Level overworld = Server.getInstance().getDefaultLevel();
+        OVERWORLD.level = overworld;
 
         // attempt to load the nether world if it is allowed in server properties
         if (Server.getInstance().isNetherAllowed() && !Server.getInstance().loadLevel("nether")) {
@@ -39,9 +40,10 @@ public enum EnumLevel {
 
         }
 
-        NETHER.level = Server.getInstance().getLevelByName("nether");
+        Level nether = Server.getInstance().getLevelByName("nether");
+        NETHER.level = nether;
 
-        if (NETHER.level == null) {
+        if (nether == null) {
             // Nether is not found or disabled
             log.warn("No level called \"nether\" found or nether is disabled in server properties! Nether functionality will be disabled.");
         }
@@ -57,9 +59,10 @@ public enum EnumLevel {
             }
         }
 
-        THE_END.level = Server.getInstance().getLevelByName("the_end");
+        Level theEnd = Server.getInstance().getLevelByName("the_end");
+        THE_END.level = theEnd;
 
-        if (THE_END.level == null) {
+        if (theEnd == null) {
             Server.getInstance().getLogger().alert("No level called \"the_end\" found or the end is disabled in server properties! The End functionality will be disabled.");
         }
     }
