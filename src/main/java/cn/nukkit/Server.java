@@ -2483,6 +2483,146 @@ public class Server {
     }
 
 
+    public Network getNetwork() {
+        return network;
+    }
+
+
+    public PluginIdentifiableCommand getPluginCommand(String name) {
+        Command command = this.commandMap.getCommand(name);
+        if (command instanceof PluginIdentifiableCommand) {
+            return (PluginIdentifiableCommand) command;
+        } else {
+            return null;
+        }
+    }
+
+    public BanList getNameBans() {
+        return this.banByName;
+    }
+
+    public BanList getIPBans() {
+        return this.banByIP;
+    }
+
+    public void addOp(String name) {
+        this.operators.set(name.toLowerCase(), true);
+        Player player = this.getPlayerExact(name);
+        if (player != null) {
+            player.recalculatePermissions();
+            player.getAdventureSettings().onOpChange(true);
+            player.getAdventureSettings().update();
+            player.sendCommandData();
+        }
+        this.operators.save(true);
+    }
+
+    public void removeOp(String name) {
+        this.operators.remove(name.toLowerCase());
+        Player player = this.getPlayerExact(name);
+        if (player != null) {
+            player.recalculatePermissions();
+            player.getAdventureSettings().onOpChange(false);
+            player.getAdventureSettings().update();
+            player.sendCommandData();
+        }
+        this.operators.save();
+    }
+
+    public void addWhitelist(String name) {
+        this.whitelist.set(name.toLowerCase(), true);
+        this.whitelist.save(true);
+    }
+
+    public void removeWhitelist(String name) {
+        this.whitelist.remove(name.toLowerCase());
+        this.whitelist.save(true);
+    }
+
+    public boolean isWhitelisted(String name) {
+        return !this.hasWhitelist() || this.operators.exists(name, true) || this.whitelist.exists(name, true);
+    }
+
+    public boolean isOp(String name) {
+        return name != null && this.operators.exists(name, true);
+    }
+
+    public Config getWhitelist() {
+        return whitelist;
+    }
+
+    public Config getOps() {
+        return operators;
+    }
+
+    public void reloadWhitelist() {
+        this.whitelist.reload();
+    }
+
+    public ServiceManager getServiceManager() {
+        return serviceManager;
+    }
+
+    public Map<String, List<String>> getCommandAliases() {
+        Object section = this.getConfig("aliases");
+        Map<String, List<String>> result = new LinkedHashMap<>();
+        if (section instanceof Map) {
+            for (Map.Entry entry : (Set<Map.Entry>) ((Map) section).entrySet()) {
+                List<String> commands = new ArrayList<>();
+                String key = (String) entry.getKey();
+                Object value = entry.getValue();
+                if (value instanceof List) {
+                    commands.addAll((List<String>) value);
+                } else {
+                    commands.add((String) value);
+                }
+
+                result.put(key, commands);
+            }
+        }
+
+        return result;
+
+    }
+
+    // TODO: update PNX Junit5 test framework to remove dependency on this method
+    private void registerEntities() {
+        Entity.init();
+    }
+
+    // TODO: update PNX Junit5 test framework to remove dependency on this method
+    private void registerBlockEntities() {
+        BlockEntity.init();
+    }
+
+    public PlayerDataSerializer getPlayerDataSerializer() {
+        return playerDataSerializer;
+    }
+
+    public void setPlayerDataSerializer(PlayerDataSerializer playerDataSerializer) {
+        this.playerDataSerializer = Preconditions.checkNotNull(playerDataSerializer, "playerDataSerializer");
+    }
+
+    public static Server getInstance() {
+        return instance;
+    }
+
+    @PowerNukkitOnly
+    @Since("1.4.0.0-PN")
+    @NotNull
+    public PositionTrackingService getPositionTrackingService() {
+        return positionTrackingService;
+    }
+
+
+    @PowerNukkitOnly
+    @Since("1.4.0.0-PN")
+    public long getLaunchTime() {
+        return launchTime;
+    }
+
+    // region level - 世界相关
+
     /**
      * @return 获得所有游戏世界<br>Get all the game world
      */
@@ -2778,145 +2918,7 @@ public class Server {
         return true;
     }
 
-
-    public Network getNetwork() {
-        return network;
-    }
-
-
-    public PluginIdentifiableCommand getPluginCommand(String name) {
-        Command command = this.commandMap.getCommand(name);
-        if (command instanceof PluginIdentifiableCommand) {
-            return (PluginIdentifiableCommand) command;
-        } else {
-            return null;
-        }
-    }
-
-    public BanList getNameBans() {
-        return this.banByName;
-    }
-
-    public BanList getIPBans() {
-        return this.banByIP;
-    }
-
-    public void addOp(String name) {
-        this.operators.set(name.toLowerCase(), true);
-        Player player = this.getPlayerExact(name);
-        if (player != null) {
-            player.recalculatePermissions();
-            player.getAdventureSettings().onOpChange(true);
-            player.getAdventureSettings().update();
-            player.sendCommandData();
-        }
-        this.operators.save(true);
-    }
-
-    public void removeOp(String name) {
-        this.operators.remove(name.toLowerCase());
-        Player player = this.getPlayerExact(name);
-        if (player != null) {
-            player.recalculatePermissions();
-            player.getAdventureSettings().onOpChange(false);
-            player.getAdventureSettings().update();
-            player.sendCommandData();
-        }
-        this.operators.save();
-    }
-
-    public void addWhitelist(String name) {
-        this.whitelist.set(name.toLowerCase(), true);
-        this.whitelist.save(true);
-    }
-
-    public void removeWhitelist(String name) {
-        this.whitelist.remove(name.toLowerCase());
-        this.whitelist.save(true);
-    }
-
-    public boolean isWhitelisted(String name) {
-        return !this.hasWhitelist() || this.operators.exists(name, true) || this.whitelist.exists(name, true);
-    }
-
-    public boolean isOp(String name) {
-        return name != null && this.operators.exists(name, true);
-    }
-
-    public Config getWhitelist() {
-        return whitelist;
-    }
-
-    public Config getOps() {
-        return operators;
-    }
-
-    public void reloadWhitelist() {
-        this.whitelist.reload();
-    }
-
-    public ServiceManager getServiceManager() {
-        return serviceManager;
-    }
-
-    public Map<String, List<String>> getCommandAliases() {
-        Object section = this.getConfig("aliases");
-        Map<String, List<String>> result = new LinkedHashMap<>();
-        if (section instanceof Map) {
-            for (Map.Entry entry : (Set<Map.Entry>) ((Map) section).entrySet()) {
-                List<String> commands = new ArrayList<>();
-                String key = (String) entry.getKey();
-                Object value = entry.getValue();
-                if (value instanceof List) {
-                    commands.addAll((List<String>) value);
-                } else {
-                    commands.add((String) value);
-                }
-
-                result.put(key, commands);
-            }
-        }
-
-        return result;
-
-    }
-
-    // TODO: update PNX Junit5 test framework to remove dependency on this method
-    private void registerEntities() {
-        Entity.init();
-    }
-
-    // TODO: update PNX Junit5 test framework to remove dependency on this method
-    private void registerBlockEntities() {
-        BlockEntity.init();
-    }
-
-    public PlayerDataSerializer getPlayerDataSerializer() {
-        return playerDataSerializer;
-    }
-
-    public void setPlayerDataSerializer(PlayerDataSerializer playerDataSerializer) {
-        this.playerDataSerializer = Preconditions.checkNotNull(playerDataSerializer, "playerDataSerializer");
-    }
-
-    public static Server getInstance() {
-        return instance;
-    }
-
-    @PowerNukkitOnly
-    @Since("1.4.0.0-PN")
-    @NotNull
-    public PositionTrackingService getPositionTrackingService() {
-        return positionTrackingService;
-    }
-
-
-    @PowerNukkitOnly
-    @Since("1.4.0.0-PN")
-    public long getLaunchTime() {
-        return launchTime;
-    }
-
+    // endregion
 
     // region config - 配置相关
 
