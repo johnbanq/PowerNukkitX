@@ -702,18 +702,7 @@ public class Server {
 
         LevelProviderManager.addProvider(this, Anvil.class);
 
-        Generator.addGenerator(Flat.class, "flat", Generator.TYPE_FLAT);
-        Generator.addGenerator(Normal.class, "normal", Generator.TYPE_INFINITE);
-        var useTerra = this.properties.getBoolean("use-terra", false);
-        if (useTerra) {
-            Generator.addGenerator(TerraGeneratorWrapper.class, "terra");
-            PNXPlatform.getInstance();
-        }
-        Generator.addGenerator(Normal.class, "default", Generator.TYPE_INFINITE);
-        Generator.addGenerator(Nether.class, "nether", Generator.TYPE_NETHER);
-        Generator.addGenerator(TheEnd.class, "the_end", Generator.TYPE_THE_END);
-        //todo: add old generator and hell generator
-
+        initializeLevelGenerators();
         boolean defaultLevelLoadSuccess = initializeLevels();
         if (defaultLevelLoadSuccess) {
             log.fatal(this.getLanguage().tr("nukkit.level.defaultError"));
@@ -2568,6 +2557,20 @@ public class Server {
     }
 
     // region level - 世界相关
+
+    private void initializeLevelGenerators() {
+        Generator.addGenerator(Flat.class, "flat", Generator.TYPE_FLAT);
+        Generator.addGenerator(Normal.class, "normal", Generator.TYPE_INFINITE);
+        var useTerra = this.properties.getBoolean("use-terra", false);
+        if (useTerra) {
+            Generator.addGenerator(TerraGeneratorWrapper.class, "terra");
+            PNXPlatform.getInstance();
+        }
+        Generator.addGenerator(Normal.class, "default", Generator.TYPE_INFINITE);
+        Generator.addGenerator(Nether.class, "nether", Generator.TYPE_NETHER);
+        Generator.addGenerator(TheEnd.class, "the_end", Generator.TYPE_THE_END);
+        //todo: add old generator and hell generator
+    }
 
     private boolean initializeLevels() {
         for (String name : this.getConfig("worlds", new HashMap<String, Object>()).keySet()) {
