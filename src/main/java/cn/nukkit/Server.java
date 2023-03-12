@@ -282,6 +282,9 @@ public class Server {
 
     private PositionTrackingService positionTrackingService;
 
+    // region level management related states //
+    // TODO: move them into manager object once after dealing with the stupid test mock framework
+
     private final Map<Integer, Level> levels = new HashMap<Integer, Level>() {
         @Override
         public Level put(Integer key, Level value) {
@@ -307,9 +310,12 @@ public class Server {
 
     private Level[] levelArray = Level.EMPTY_ARRAY;
 
+    private Level defaultLevel = null;
+
+    // endregion
+
     private final ServiceManager serviceManager = new NKServiceManager();
 
-    private Level defaultLevel = null;
 
     private boolean allowNether;
 
