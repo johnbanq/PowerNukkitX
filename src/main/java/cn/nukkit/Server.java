@@ -1225,11 +1225,7 @@ public class Server {
     public void reload() {
         log.info("Reloading...");
 
-        log.info("Saving levels...");
-
-        for (Level level : this.levelArray) {
-            level.save();
-        }
+        levelManagerReload();
 
         this.scoreboardManager.save();
 
@@ -1272,7 +1268,6 @@ public class Server {
         getPluginManager().callEvent(serverStartedEvent);
         Timings.reset();
     }
-
 
     /**
      * 关闭服务器
@@ -1324,10 +1319,7 @@ public class Server {
             this.scheduler.cancelAllTasks();
             this.scheduler.mainThreadHeartbeat(Integer.MAX_VALUE);
 
-            log.debug("Unloading all levels");
-            for (Level level : this.levelArray) {
-                this.unloadLevel(level, true);
-            }
+            levelManagerShutdown();
 
             if (positionTrackingService != null) {
                 log.debug("Closing position tracking service");
@@ -2676,6 +2668,20 @@ public class Server {
         return defaultLevelLoadSuccess;
     }
 
+    private void levelManagerReload() {
+        log.info("Saving levels...");
+
+        for (Level level : this.levelArray) {
+            level.save();
+        }
+    }
+
+    private void levelManagerShutdown() {
+        log.debug("Unloading all levels");
+        for (Level level : this.levelArray) {
+            this.unloadLevel(level, true);
+        }
+    }
 
     /**
      * @return 获得所有游戏世界<br>Get all the game world
