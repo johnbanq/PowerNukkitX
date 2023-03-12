@@ -708,9 +708,7 @@ public class Server {
             this.forceShutdown();
             return;
         }
-
-        EnumLevel.initLevels();
-
+        initializeLevelSingletons();
         this.getTickingAreaManager().loadAllTickingArea();
 
         this.properties.save(true);
@@ -2556,7 +2554,11 @@ public class Server {
     }
 
     // region level - 世界相关
-    
+
+    private static void initializeLevelSingletons() {
+        EnumLevel.initLevels();
+    }
+
     private void initializeLevelStorageProviders() {
         LevelProviderManager.addProvider(this, Anvil.class);
     }
